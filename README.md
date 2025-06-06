@@ -8,6 +8,7 @@
 # 如何使用
 
 ```shell
+cd STLviewer/
 python -m http.server 8000
 ```
 
@@ -17,6 +18,10 @@ http://localhost:8000/stlviewer.html
 
 
 ![Alt text](./imgs/image.png)
+
+这里加载了一个模型：
+
+![Alt text](./imgs/image-2.png)
 
 网页下面自带使用说明
 ![Alt text](./imgs/image-1.png)
