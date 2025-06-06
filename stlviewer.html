@@ -1,0 +1,923 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Three.js多STL文件可视化</title>
+    <script src="./js/three.min.js"></script>
+    <script src="./js/OrbitControls.js"></script>
+    <script src="./js/STLLoader.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #1a2a6c, #2c3e50);
+            color: #ecf0f1;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+        
+        .container {
+            max-width: 1800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        header {
+            text-align: center;
+            padding: 30px 0;
+            margin-bottom: 20px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 15px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+        
+        h1 {
+            font-size: 2.8rem;
+            margin-bottom: 10px;
+            background: linear-gradient(45deg, #3498db, #2ecc71);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+        
+        .subtitle {
+            font-size: 1.2rem;
+            opacity: 0.8;
+            max-width: 800px;
+            margin: 0 auto;
+            line-height: 1.6;
+        }
+        
+        .content {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 25px;
+            margin-top: 20px;
+        }
+        
+        .viewer-section {
+            flex: 2;
+            min-width: 300px;
+            background: rgba(25, 35, 65, 0.7);
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .controls-section {
+            flex: 1;
+            min-width: 300px;
+            background: rgba(25, 35, 65, 0.7);
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        
+        .section-title {
+            font-size: 1.5rem;
+            margin-bottom: 20px;
+            color: #3498db;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 8px;
+        }
+        
+        #stl-viewer {
+            width: 100%;
+            height: 800px;
+            background: rgba(10, 15, 30, 0.6);
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.4);
+        }
+        
+        .upload-area {
+            border: 3px dashed #3498db;
+            border-radius: 10px;
+            padding: 25px;
+            text-align: center;
+            transition: all 0.3s;
+            background: rgba(10, 20, 40, 0.4);
+            cursor: pointer;
+        }
+        
+        .upload-area:hover {
+            background: rgba(52, 152, 219, 0.2);
+            border-color: #2ecc71;
+        }
+        
+        .upload-area i {
+            font-size: 3rem;
+            margin-bottom: 15px;
+            display: block;
+            color: #3498db;
+        }
+        
+        .upload-area p {
+            margin-bottom: 15px;
+        }
+        
+        .btn {
+            background: linear-gradient(45deg, #3498db, #2ecc71);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 50px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: 600;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        }
+        
+        .btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+        }
+        
+        .btn:active {
+            transform: translateY(1px);
+        }
+        
+        .model-controls {
+            background: rgba(10, 20, 40, 0.4);
+            border-radius: 10px;
+            padding: 20px;
+        }
+        
+        .control-group {
+            margin-bottom: 20px;
+        }
+        
+        .control-group h3 {
+            font-size: 1.1rem;
+            margin-bottom: 12px;
+            color: #2ecc71;
+        }
+        
+        .slider-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        
+        .slider-container label {
+            min-width: 80px;
+        }
+        
+        input[type="range"] {
+            flex: 1;
+            height: 6px;
+            border-radius: 3px;
+            background: rgba(200, 200, 200, 0.2);
+            outline: none;
+            -webkit-appearance: none;
+        }
+        
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #3498db;
+            cursor: pointer;
+        }
+        
+        .model-list {
+            max-height: 200px;
+            overflow-y: auto;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 8px;
+        }
+        
+        .model-item {
+            padding: 10px;
+            background: rgba(52, 152, 219, 0.1);
+            margin-bottom: 8px;
+            border-radius: 6px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .model-item.active {
+            background: rgba(46, 204, 113, 0.2);
+            border-left: 4px solid #2ecc71;
+        }
+        
+        .model-name {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            max-width: 70%;
+        }
+        
+        .delete-btn {
+            background: rgba(231, 76, 60, 0.3);
+            color: #e74c3c;
+            border: none;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.2s;
+        }
+        
+        .delete-btn:hover {
+            background: rgba(231, 76, 60, 0.8);
+            color: white;
+        }
+        
+        .instructions {
+            background: rgba(10, 20, 40, 0.4);
+            border-radius: 10px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+        
+        .instructions ul {
+            padding-left: 20px;
+            margin-top: 10px;
+        }
+        
+        .instructions li {
+            margin-bottom: 8px;
+            line-height: 1.5;
+        }
+        
+        .instructions li strong {
+            color: #3498db;
+        }
+        
+        footer {
+            text-align: center;
+            margin-top: 40px;
+            padding: 20px;
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 0.9rem;
+        }
+        
+        @media (max-width: 768px) {
+            .content {
+                flex-direction: column;
+            }
+            
+            h1 {
+                font-size: 2.2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>多STL文件3D可视化工具</h1>
+            <p class="subtitle">使用Three.js技术同时加载和展示多个STL格式的3D模型，支持模型位置、旋转和缩放调整</p>
+        </header>
+        
+        <div class="content">
+            <section class="viewer-section">
+                <h2 class="section-title">3D模型预览区</h2>
+                <div id="stl-viewer"></div>
+            </section>
+            
+            <section class="controls-section">
+                <h2 class="section-title">模型控制面板</h2>
+                
+                <div class="upload-area" id="drop-zone">
+                    <i>📁</i>
+                    <p>拖放STL文件到此处或点击上传</p>
+                    <input type="file" id="file-input" accept=".stl" multiple style="display: none;">
+                    <button class="btn" onclick="document.getElementById('file-input').click()">选择STL文件</button>
+                </div>
+                
+                <div class="model-controls">
+                    <h3>已加载模型</h3>
+                    <div class="model-list" id="model-list">
+                        <p style="text-align: center; opacity: 0.7;">暂无模型，请上传STL文件</p>
+                    </div>
+                </div>
+                
+                <div class="model-controls">
+                    <h3>模型控制</h3>
+                    <!-- 位置控制组 -->
+                    <div class="control-group">
+                        <div class="slider-container">
+                            <label>位置 X:</label>
+                            <input type="range" id="pos-x" min="-50" max="50" value="0" step="0.1">
+                            <input type="number" id="pos-x-input" min="-50" max="50" value="0" step="0.1" style="width: 80px; padding: 4px; border-radius: 4px; border: 1px solid #3498db; background: rgba(255, 255, 255, 0.1); color: white;">
+                        </div>
+                        <div class="slider-container">
+                            <label>位置 Y:</label>
+                            <input type="range" id="pos-y" min="-50" max="50" value="0" step="0.1">
+                            <input type="number" id="pos-y-input" min="-50" max="50" value="0" step="0.1" style="width: 80px; padding: 4px; border-radius: 4px; border: 1px solid #3498db; background: rgba(255, 255, 255, 0.1); color: white;">
+                        </div>
+                        <div class="slider-container">
+                            <label>位置 Z:</label>
+                            <input type="range" id="pos-z" min="-50" max="50" value="0" step="0.1">
+                            <input type="number" id="pos-z-input" min="-50" max="50" value="0" step="0.1" style="width: 80px; padding: 4px; border-radius: 4px; border: 1px solid #3498db; background: rgba(255, 255, 255, 0.1); color: white;">
+                        </div>
+                    </div>
+
+                    <!-- 旋转控制组 -->
+                    <div class="control-group">
+                        <div class="slider-container">
+                            <label>旋转 X:</label>
+                            <input type="range" id="rot-x" min="0" max="360" value="0" step="1">
+                            <input type="number" id="rot-x-input" min="0" max="360" value="0" step="1" style="width: 80px; padding: 4px; border-radius: 4px; border: 1px solid #3498db; background: rgba(255, 255, 255, 0.1); color: white;">
+                        </div>
+                        <div class="slider-container">
+                            <label>旋转 Y:</label>
+                            <input type="range" id="rot-y" min="0" max="360" value="0" step="1">
+                            <input type="number" id="rot-y-input" min="0" max="360" value="0" step="1" style="width: 80px; padding: 4px; border-radius: 4px; border: 1px solid #3498db; background: rgba(255, 255, 255, 0.1); color: white;">
+                        </div>
+                        <div class="slider-container">
+                            <label>旋转 Z:</label>
+                            <input type="range" id="rot-z" min="0" max="360" value="0" step="1">
+                            <input type="number" id="rot-z-input" min="0" max="360" value="0" step="1" style="width: 80px; padding: 4px; border-radius: 4px; border: 1px solid #3498db; background: rgba(255, 255, 255, 0.1); color: white;">
+                        </div>
+                    </div>
+
+                    <!-- 缩放控制组 -->
+                    <div class="control-group">
+                        <div class="slider-container">
+                            <label>缩放:</label>
+                            <input type="range" id="scale" min="0.1" max="5" value="1" step="0.1">
+                            <input type="number" id="scale-input" min="0.1" max="5" value="1" step="0.1" style="width: 80px; padding: 4px; border-radius: 4px; border: 1px solid #3498db; background: rgba(255, 255, 255, 0.1); color: white;">
+                        </div>
+                    </div>
+
+
+
+                </div>
+            </section>
+        </div>
+        
+        <div class="instructions">
+            <h3>使用说明：</h3>
+            <ul>
+                <li><strong>上传文件</strong>：点击"选择STL文件"按钮或拖放STL文件到上传区域</li>
+                <li><strong>导航控制</strong>：左键拖动旋转视图，右键拖动平移，滚轮缩放</li>
+                <li><strong>模型选择</strong>：在已加载模型列表中点击选择要操作的模型</li>
+                <li><strong>位置调整</strong>：使用位置滑块调整模型在X/Y/Z轴的位置</li>
+                <li><strong>旋转控制</strong>：使用旋转滑块调整模型在X/Y/Z轴的旋转角度</li>
+                <li><strong>缩放控制</strong>：使用缩放滑块调整模型大小</li>
+                <li><strong>删除模型</strong>：点击模型项右侧的删除按钮移除模型</li>
+            </ul>
+        </div>
+        
+        <footer>
+            <p>© 2023 Three.js STL可视化工具 | 使用Three.js v0.132.2</p>
+        </footer>
+    </div>
+
+    <script>
+        // 全局变量
+        let scene, camera, renderer, controls;
+        let stlLoader;
+        let models = [];
+        let activeModel = null;
+        
+        // 初始化场景
+        function init() {
+            // 创建场景
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x0c1c3f);
+            scene.fog = new THREE.Fog(0x0c1c3f, 20, 100);
+            
+            // 创建相机
+            camera = new THREE.PerspectiveCamera(
+                75, 
+                window.innerWidth / window.innerHeight, 
+                0.1, 
+                1000
+            );
+            camera.position.z = 30;
+            camera.position.y = 15;
+            
+            // 创建渲染器
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(document.getElementById('stl-viewer').offsetWidth, 
+                            document.getElementById('stl-viewer').offsetHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            document.getElementById('stl-viewer').appendChild(renderer.domElement);
+            
+            // 添加轨道控制
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            
+            // 添加光源
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+            scene.add(ambientLight);
+            
+            const directionalLight1 = new THREE.DirectionalLight(0xffffff, 0.8);
+            directionalLight1.position.set(1, 1, 1);
+            scene.add(directionalLight1);
+            
+            const directionalLight2 = new THREE.DirectionalLight(0xffffff, 0.5);
+            directionalLight2.position.set(-1, -1, -1);
+            scene.add(directionalLight2);
+            
+            // 添加坐标轴辅助
+            const axesHelper = new THREE.AxesHelper(10);
+            scene.add(axesHelper);
+            
+            // 添加网格地面
+            const gridHelper = new THREE.GridHelper(50, 20, 0x3498db, 0x2c3e50);
+            scene.add(gridHelper);
+            
+            // 初始化STL加载器
+            stlLoader = new THREE.STLLoader();
+            
+            // 添加窗口大小调整监听
+            window.addEventListener('resize', onWindowResize);
+            
+            // 设置文件拖放事件
+            setupDragAndDrop();
+            
+            // 设置控制事件
+            setupControls();
+            
+            // 开始动画循环
+            animate();
+            
+            // 加载示例模型
+            loadExampleModels();
+        }
+        
+        // 加载示例模型
+        function loadExampleModels() {
+            const exampleModels = [
+                './meshes/link11.STL',
+                './meshes/link12.STL',
+                './meshes/link13.STL',
+
+            ];
+            
+            exampleModels.forEach((url, index) => {
+                stlLoader.load(url, function (geometry) {
+                    createModel(geometry, `示例模型 ${index + 1}`, getRandomColor());
+                });
+            });
+        }
+        
+        // 创建模型
+        function createModel(geometry, name, color) {
+            const material = new THREE.MeshPhongMaterial({ 
+                color: color,
+                specular: 0x111111,
+                shininess: 80,
+                flatShading: true
+            });
+            
+            const mesh = new THREE.Mesh(geometry, material);
+            
+            // 计算几何中心并居中模型
+            geometry.computeBoundingBox();
+            const center = new THREE.Vector3();
+            geometry.boundingBox.getCenter(center);
+            mesh.geometry.center();
+            
+            // 根据模型数量设置位置
+            const spacing = 15;
+            const x = (models.length % 3 - 1) * spacing;
+            const z = Math.floor(models.length / 3) * spacing;
+            mesh.position.set(x, 0, z);
+            
+            // 添加到场景
+            scene.add(mesh);
+            
+            // 存储模型信息
+            const modelInfo = {
+                name: name,
+                mesh: mesh,
+                color: color,
+                defaultPosition: { x: x, y: 0, z: z },
+                defaultRotation: { x: 0, y: 0, z: 0 },
+                defaultScale: 1
+            };
+            
+            models.push(modelInfo);
+            
+            // 添加到模型列表
+            addToModelList(modelInfo);
+            
+            // 设置为活动模型
+            setActiveModel(modelInfo);
+        }
+        
+        // 添加到模型列表
+        function addToModelList(model) {
+            const modelList = document.getElementById('model-list');
+            
+            // 如果显示"暂无模型"则移除
+            if (modelList.querySelector('p')) {
+                modelList.innerHTML = '';
+            }
+            
+            const modelItem = document.createElement('div');
+            modelItem.className = 'model-item';
+            modelItem.innerHTML = `
+                <div class="model-name">${model.name}</div>
+                <button class="delete-btn" data-id="${models.length - 1}">×</button>
+            `;
+            
+            modelItem.addEventListener('click', () => {
+                setActiveModel(model);
+            });
+            
+            modelList.appendChild(modelItem);
+            
+            // 添加删除按钮事件
+            const deleteBtn = modelItem.querySelector('.delete-btn');
+            deleteBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                deleteModel(model);
+            });
+        }
+        
+        // 设置活动模型
+        function setActiveModel(model) {
+            // 移除之前的活动状态
+            document.querySelectorAll('.model-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            
+            // 设置新活动模型
+            activeModel = model;
+            
+            // 找到对应的列表项并添加活动状态
+            const modelItems = document.querySelectorAll('.model-item');
+            modelItems.forEach((item, index) => {
+                if (models[index] === model) {
+                    item.classList.add('active');
+                }
+            });
+            
+            // 更新控制滑块
+            updateControlSliders();
+        }
+        
+        // 更新控制滑块
+        function updateControlSliders() {
+            if (!activeModel) return;
+            
+            // document.getElementById('pos-x').value = activeModel.mesh.position.x;
+            // document.getElementById('pos-y').value = activeModel.mesh.position.y;
+            // document.getElementById('pos-z').value = activeModel.mesh.position.z;
+            
+            // document.getElementById('rot-x').value = THREE.MathUtils.radToDeg(activeModel.mesh.rotation.x);
+            // document.getElementById('rot-y').value = THREE.MathUtils.radToDeg(activeModel.mesh.rotation.y);
+            // document.getElementById('rot-z').value = THREE.MathUtils.radToDeg(activeModel.mesh.rotation.z);
+            
+            // document.getElementById('scale').value = activeModel.mesh.scale.x;
+
+            // 位置输入框同步
+            document.getElementById('pos-x').value = activeModel.mesh.position.x;
+            document.getElementById('pos-x-input').value = activeModel.mesh.position.x.toFixed(1); // 保留1位小数
+            document.getElementById('pos-y').value = activeModel.mesh.position.y;
+            document.getElementById('pos-y-input').value = activeModel.mesh.position.y.toFixed(1);
+            document.getElementById('pos-z').value = activeModel.mesh.position.z;
+            document.getElementById('pos-z-input').value = activeModel.mesh.position.z.toFixed(1);
+            
+            // 旋转输入框同步（角度转数值）
+            const rotX = THREE.MathUtils.radToDeg(activeModel.mesh.rotation.x);
+            const rotY = THREE.MathUtils.radToDeg(activeModel.mesh.rotation.y);
+            const rotZ = THREE.MathUtils.radToDeg(activeModel.mesh.rotation.z);
+            document.getElementById('rot-x').value = rotX;
+            document.getElementById('rot-x-input').value = rotX.toFixed(0); // 整数
+            document.getElementById('rot-y').value = rotY;
+            document.getElementById('rot-y-input').value = rotY.toFixed(0);
+            document.getElementById('rot-z').value = rotZ;
+            document.getElementById('rot-z-input').value = rotZ.toFixed(0);
+            
+            // 缩放输入框同步
+            const scale = activeModel.mesh.scale.x;
+            document.getElementById('scale').value = scale;
+            document.getElementById('scale-input').value = scale.toFixed(1);
+        }
+
+      
+        // 删除模型
+        function deleteModel(model) {
+            // 从场景中移除模型
+            scene.remove(model.mesh);
+            
+            // 从模型中移除
+            const index = models.indexOf(model);
+            if (index !== -1) {
+                models.splice(index, 1);
+            }
+            
+            // 更新模型列表
+            const modelList = document.getElementById('model-list');
+            modelList.innerHTML = models.length === 0 ? 
+                '<p style="text-align: center; opacity: 0.7;">暂无模型，请上传STL文件</p>' : '';
+            
+            // 重新添加剩余模型到列表
+            models.forEach((model, idx) => {
+                const modelItem = document.createElement('div');
+                modelItem.className = 'model-item';
+                if (model === activeModel) modelItem.classList.add('active');
+                modelItem.innerHTML = `
+                    <div class="model-name">${model.name}</div>
+                    <button class="delete-btn" data-id="${idx}">×</button>
+                `;
+                
+                modelItem.addEventListener('click', () => {
+                    setActiveModel(model);
+                });
+                
+                const deleteBtn = modelItem.querySelector('.delete-btn');
+                deleteBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    deleteModel(model);
+                });
+                
+                modelList.appendChild(modelItem);
+            });
+            
+            // 如果没有活动模型且还有模型，设置第一个为活动模型
+            if (models.length > 0 && !activeModel) {
+                setActiveModel(models[0]);
+            } else {
+                activeModel = null;
+            }
+        }
+        
+        // 设置拖放事件
+        function setupDragAndDrop() {
+            const dropZone = document.getElementById('drop-zone');
+            const fileInput = document.getElementById('file-input');
+            
+            // 点击上传区域触发文件选择
+            dropZone.addEventListener('click', () => {
+                fileInput.click();
+            });
+            
+            // 文件选择变化
+            fileInput.addEventListener('change', handleFileSelect);
+            
+            // 拖放事件
+            dropZone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                dropZone.style.backgroundColor = 'rgba(52, 152, 219, 0.3)';
+                dropZone.style.borderColor = '#2ecc71';
+            });
+            
+            dropZone.addEventListener('dragleave', () => {
+                dropZone.style.backgroundColor = 'rgba(10, 20, 40, 0.4)';
+                dropZone.style.borderColor = '#3498db';
+            });
+            
+            dropZone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dropZone.style.backgroundColor = 'rgba(10, 20, 40, 0.4)';
+                dropZone.style.borderColor = '#3498db';
+                
+                if (e.dataTransfer.files.length) {
+                    handleFiles(e.dataTransfer.files);
+                }
+            });
+        }
+        
+        // 处理文件选择
+        function handleFileSelect(e) {
+            if (e.target.files.length) {
+                handleFiles(e.target.files);
+            }
+        }
+        
+        // 处理上传的文件
+        function handleFiles(files) {
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+                
+                // 检查是否为STL文件
+                if (!file.name.toLowerCase().endsWith('.stl')) {
+                    alert('请上传STL格式的文件');
+                    continue;
+                }
+                
+                const reader = new FileReader();
+                
+                reader.onload = function(event) {
+                    try {
+                        // 尝试解析STL文件
+                        const geometry = stlLoader.parse(event.target.result);
+                        createModel(geometry, file.name, getRandomColor());
+                    } catch (error) {
+                        // 解析失败时提示用户
+                        alert(`文件 ${file.name} 加载失败：${error.message}`);
+                    }
+                };
+                
+                // 新增：处理文件读取失败的情况
+                reader.onerror = function() {
+                    alert(`文件 ${file.name} 读取失败，请检查文件是否损坏`);
+                };
+                
+                reader.readAsArrayBuffer(file);
+            }
+        }
+        
+        // 设置控制事件
+        function setupControls() {
+            // 位置控制（滑块→输入框）
+            document.getElementById('pos-x').addEventListener('input', (e) => {
+                if (activeModel) {
+                    const value = parseFloat(e.target.value);
+                    activeModel.mesh.position.x = value;
+                    document.getElementById('pos-x-input').value = value.toFixed(1); // 更新输入框
+                }
+            });
+            // 位置控制（输入框→滑块）
+            document.getElementById('pos-x-input').addEventListener('input', (e) => {
+                const value = parseFloat(e.target.value);
+                if (!isNaN(value) && activeModel) {
+                    activeModel.mesh.position.x = value;
+                    document.getElementById('pos-x').value = value; // 更新滑块
+                }
+            });
+
+            // 位置控制（滑块→输入框）
+            document.getElementById('pos-y').addEventListener('input', (e) => {
+                if (activeModel) {
+                    const value = parseFloat(e.target.value);
+                    activeModel.mesh.position.y = value;
+                    document.getElementById('pos-y-input').value = value.toFixed(1); // 更新输入框
+                }
+            });
+            // 位置控制（输入框→滑块）
+            document.getElementById('pos-y-input').addEventListener('input', (e) => {
+                const value = parseFloat(e.target.value);
+                if (!isNaN(value) && activeModel) {
+                    activeModel.mesh.position.y = value;
+                    document.getElementById('pos-y').value = value; // 更新滑块
+                }
+            });
+            // 位置控制（滑块→输入框）
+            document.getElementById('pos-z').addEventListener('input', (e) => {
+                if (activeModel) {
+                    const value = parseFloat(e.target.value);
+                    activeModel.mesh.position.z = value;
+                    document.getElementById('pos-z-input').value = value.toFixed(1); // 更新输入框
+                }
+            });
+            // 位置控制（输入框→滑块）
+            document.getElementById('pos-z-input').addEventListener('input', (e) => {
+                const value = parseFloat(e.target.value);
+                if (!isNaN(value) && activeModel) {
+                    activeModel.mesh.position.z = value;
+                    document.getElementById('pos-z').value = value; // 更新滑块
+                }
+            });
+
+            // 旋转控制（滑块→输入框）
+            document.getElementById('rot-x').addEventListener('input', (e) => {
+                if (activeModel) {
+                    const deg = parseFloat(e.target.value);
+                    activeModel.mesh.rotation.x = THREE.MathUtils.degToRad(deg);
+                    document.getElementById('rot-x-input').value = deg.toFixed(0); // 更新输入框
+                }
+            });
+            // 旋转控制（输入框→滑块）
+            document.getElementById('rot-x-input').addEventListener('input', (e) => {
+                const deg = parseFloat(e.target.value);
+                if (!isNaN(deg) && activeModel) {
+                    activeModel.mesh.rotation.x = THREE.MathUtils.degToRad(deg);
+                    document.getElementById('rot-x').value = deg; // 更新滑块
+                }
+            });
+            // 旋转控制（滑块→输入框）
+            document.getElementById('rot-y').addEventListener('input', (e) => {
+                if (activeModel) {
+                    const deg = parseFloat(e.target.value);
+                    activeModel.mesh.rotation.y = THREE.MathUtils.degToRad(deg);
+                    document.getElementById('rot-y-input').value = deg.toFixed(0); // 更新输入框
+                }
+            });
+            // 旋转控制（输入框→滑块）
+            document.getElementById('rot-y-input').addEventListener('input', (e) => {
+                const deg = parseFloat(e.target.value);
+                if (!isNaN(deg) && activeModel) {
+                    activeModel.mesh.rotation.y = THREE.MathUtils.degToRad(deg);
+                    document.getElementById('rot-y').value = deg; // 更新滑块
+                }
+            });
+            // 旋转控制（滑块→输入框）
+            document.getElementById('rot-z').addEventListener('input', (e) => {
+                if (activeModel) {
+                    const deg = parseFloat(e.target.value);
+                    activeModel.mesh.rotation.z = THREE.MathUtils.degToRad(deg);
+                    document.getElementById('rot-z-input').value = deg.toFixed(0); // 更新输入框
+                }
+            });
+            // 旋转控制（输入框→滑块）
+            document.getElementById('rot-z-input').addEventListener('input', (e) => {
+                const deg = parseFloat(e.target.value);
+                if (!isNaN(deg) && activeModel) {
+                    activeModel.mesh.rotation.z = THREE.MathUtils.degToRad(deg);
+                    document.getElementById('rot-z').value = deg; // 更新滑块
+                }
+            });
+
+            // 缩放控制（滑块→输入框）
+            document.getElementById('scale').addEventListener('input', (e) => {
+                if (activeModel) {
+                    const scale = parseFloat(e.target.value);
+                    activeModel.mesh.scale.set(scale, scale, scale);
+                    document.getElementById('scale-input').value = scale.toFixed(1); // 更新输入框
+                }
+            });
+            // 缩放控制（输入框→滑块）
+            document.getElementById('scale-input').addEventListener('input', (e) => {
+                const scale = parseFloat(e.target.value);
+                if (!isNaN(scale) && activeModel) {
+                    activeModel.mesh.scale.set(scale, scale, scale);
+                    document.getElementById('scale').value = scale; // 更新滑块
+                }
+            });
+
+            // 位置控制
+            document.getElementById('pos-x').addEventListener('input', (e) => {
+                if (activeModel) activeModel.mesh.position.x = parseFloat(e.target.value);
+            });
+            
+            document.getElementById('pos-y').addEventListener('input', (e) => {
+                if (activeModel) activeModel.mesh.position.y = parseFloat(e.target.value);
+            });
+            
+            document.getElementById('pos-z').addEventListener('input', (e) => {
+                if (activeModel) activeModel.mesh.position.z = parseFloat(e.target.value);
+            });
+            
+            // 旋转控制
+            document.getElementById('rot-x').addEventListener('input', (e) => {
+                if (activeModel) activeModel.mesh.rotation.x = THREE.MathUtils.degToRad(parseFloat(e.target.value));
+            });
+            
+            document.getElementById('rot-y').addEventListener('input', (e) => {
+                if (activeModel) activeModel.mesh.rotation.y = THREE.MathUtils.degToRad(parseFloat(e.target.value));
+            });
+            
+            document.getElementById('rot-z').addEventListener('input', (e) => {
+                if (activeModel) activeModel.mesh.rotation.z = THREE.MathUtils.degToRad(parseFloat(e.target.value));
+            });
+            
+            // 缩放控制
+            document.getElementById('scale').addEventListener('input', (e) => {
+                if (activeModel) {
+                    const scale = parseFloat(e.target.value);
+                    activeModel.mesh.scale.set(scale, scale, scale);
+                }
+            });
+        }
+        
+        // 窗口大小调整
+        function onWindowResize() {
+            camera.aspect = document.getElementById('stl-viewer').offsetWidth / 
+                            document.getElementById('stl-viewer').offsetHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(document.getElementById('stl-viewer').offsetWidth, 
+                            document.getElementById('stl-viewer').offsetHeight);
+        }
+        
+        // 动画循环
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+        
+        // 获取随机颜色
+        function getRandomColor() {
+            const colors = [
+                0xff6b6b, 0x4ecdc4, 0xffbe0b, 0xfb5607, 
+                0x8338ec, 0x3a86ff, 0x2a9d8f, 0xe9c46a,
+                0xf4a261, 0xe76f51, 0x2a9d8f, 0x264653
+            ];
+            return colors[Math.floor(Math.random() * colors.length)];
+        }
+        
+        // 初始化
+        window.onload = init;
+    </script>
+</body>
+</html>
